@@ -53,10 +53,9 @@ class KeyResponseError(Exception):
 
     pass
 
-
 class VerdictUnknown(Exception):
     """Неизвестный вердикт домашней работы."""
-
+    
     pass
 
 
@@ -74,6 +73,7 @@ def send_message(bot, message):
         )
     except Exception as error:
         logger.error(f'Ошибка при отправке сообщения Telegram - {error}')
+    except telegram.error:
         raise NotSentTelegramMessage
     else:
         logger.debug('Сообщение успешно отправленно в Telegram')
@@ -104,6 +104,14 @@ def get_api_answer(timestamp):
 
 def check_response(response):
     """Функция принимет словарь на вход и проверяет его содержимое."""
+    RESPONSE_FIELDS = (
+        'id',
+        'status',
+        'homework_name',
+        'reviewer_comment',
+        'date_updated',
+        'lesson_name',
+    )
     if not isinstance(response, dict):
         raise TypeError
     try:
@@ -132,7 +140,7 @@ def parse_status(homework):
         raise TypeError
     verdict = HOMEWORK_VERDICTS.get(status)
     if verdict is None:
-        raise VerdictUnknown
+        raise NotCorrectStatus
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
 
@@ -150,23 +158,24 @@ def main():
             homeworks = check_response(response)
             if homeworks:
                 message = parse_status(homeworks[0])
-                if message != prev_message:
-                    prev_message = message
-                    send_message(bot, message)
             else:
-                logger.info('Ничего нового')
-        except KeyResponseError:
-            logger.error('В ответе API отсутствует ожидаемый ключ')
+                message = prev_message
+                logger.debug('Нет изменений')
+            if message != prev_message:
+                send_message(bot, message)
+                prev_message = message
         except NotCorrectStatus:
             logger.error('При запросе к API получен некорректный ответ')
-        except VerdictUnknown:
-            logging.error('Неожиданный статус домашней работы')
         except NotSentTelegramMessage:
-            logger.debug('Не отправилось сообщение почему-то')
+            message = 'Ошибка при отправке сообщения Telegram'
+            send_message(bot, message)
+            logger.error = message
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             logger.error(message)
-            send_message(bot, f'Сбой работы в программе: {error}')
+            if message != prev_message:
+                send_message(bot, message)
+                prev_message = message
         finally:
             timestamp += RETRY_PERIOD
             time.sleep(RETRY_PERIOD)
