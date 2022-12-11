@@ -104,14 +104,6 @@ def get_api_answer(timestamp):
 
 def check_response(response):
     """Функция принимет словарь на вход и проверяет его содержимое."""
-    RESPONSE_FIELDS = (
-        'id',
-        'status',
-        'homework_name',
-        'reviewer_comment',
-        'date_updated',
-        'lesson_name',
-    )
     if not isinstance(response, dict):
         raise TypeError
     try:
