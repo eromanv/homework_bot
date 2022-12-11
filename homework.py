@@ -53,9 +53,10 @@ class KeyResponseError(Exception):
 
     pass
 
+
 class VerdictUnknown(Exception):
     """Неизвестный вердикт домашней работы."""
-    
+
     pass
 
 
