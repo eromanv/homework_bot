@@ -151,12 +151,11 @@ def main():
             homeworks = check_response(response)
             if homeworks:
                 message = parse_status(homeworks[0])
-            else:
-                message = prev_message
-                logger.debug('Нет изменений')
-            if message != prev_message:
-                send_message(bot, message)
-                prev_message = message
+                if message != prev_message:
+                    send_message(bot, message)
+                    prev_message = message
+                else:
+                    logger.info('Ничего нового')
         except KeyResponseError:
             logger.error('В ответе API отсутствует ожидаемый ключ')
         except NotCorrectStatus:
@@ -165,15 +164,11 @@ def main():
             logging.error('Неожиданный статус домашней работы')
             return None
         except NotSentTelegramMessage:
-            message = 'Ошибка при отправке сообщения Telegram'
-            send_message(bot, message)
-            logger.error = message
+            logger.error('Ошибка при отправке сообщения Telegram')
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             logger.error(message)
-            if message != prev_message:
-                send_message(bot, message)
-                prev_message = message
+            send_message(bot, f'Сбой работы в программе: {error}')
         finally:
             timestamp += RETRY_PERIOD
             time.sleep(RETRY_PERIOD)
