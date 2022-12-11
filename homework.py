@@ -152,10 +152,10 @@ def main():
             if homeworks:
                 message = parse_status(homeworks[0])
                 if message != prev_message:
-                    send_message(bot, message)
                     prev_message = message
-                else:
-                    logger.info('Ничего нового')
+                    send_message(bot, message)
+            else:
+                logger.info('Ничего нового')
         except KeyResponseError:
             logger.error('В ответе API отсутствует ожидаемый ключ')
         except NotCorrectStatus:
