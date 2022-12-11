@@ -1,13 +1,14 @@
 """Импорт данных для проверки домашней работы."""
+import json
 import logging
 import os
 import sys
 import time
+from http import HTTPStatus
 
 import requests
 import telegram
 from dotenv import load_dotenv
-from http import HTTPStatus
 
 load_dotenv()
 
@@ -35,12 +36,33 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 
+class NotSentTelegramMessage(Exception):
+    """Определяем исключение для отправки сообщения."""
+
+    pass
+
+
+class NotCorrectStatus(Exception):
+    """Статус работы при запросе к API."""
+
+    pass
+
+
+class KeyResponseError(Exception):
+    """Не получен ожидаемый ключ."""
+
+    pass
+
+
+class VerdictUnknown(Exception):
+    """Неизвестный вердикт домашней работы."""
+
+    pass
+
+
 def check_tokens():
     """Функция проверяет наличие всех необходимых локальных переменных."""
-    if not PRACTICUM_TOKEN or not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
-        logger.critical('Отсутствует одна из переменных окружения')
-        return False
-    return True
+    return all((PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID))
 
 
 def send_message(bot, message):
@@ -52,6 +74,8 @@ def send_message(bot, message):
         )
     except Exception as error:
         logger.error(f'Ошибка при отправке сообщения Telegram - {error}')
+    except telegram.error:
+        raise NotSentTelegramMessage
     else:
         logger.debug('Сообщение успешно отправленно в Telegram')
 
@@ -66,9 +90,14 @@ def get_api_answer(timestamp):
         )
     except requests.RequestException as error:
         logging.error(f'Ошибка при запросе к основному API: {error}')
+
     if response.status_code != HTTPStatus.OK:
-        raise ConnectionError
-    response = response.json()
+        raise NotCorrectStatus
+    try:
+        return response.json()
+    except json.JSONDecodeError:
+        logging.error('Сервер вернул невалидный ответ')
+        send_message('Сервер вернул невалидный ответ')
     if not isinstance(response, dict):
         raise TypeError
     return response
@@ -76,28 +105,20 @@ def get_api_answer(timestamp):
 
 def check_response(response):
     """Функция принимет словарь на вход и проверяет его содержимое."""
-    response_fields = [
-        'id',
-        'status',
-        'homework_name',
-        'reviewer_comment',
-        'date_updated',
-        'lesson_name',
-    ]
     if not isinstance(response, dict):
         raise TypeError
-    homework_list = response.get('homeworks')
-    if not isinstance(homework_list, list):
-        raise TypeError
-    if len(homework_list) < 1:
-        return None
-    for homework in homework_list:
-        for field in response_fields:
-            if not homework.get(field):
-                logging.error(
-                    f'В ответе API отсутствует ожидаемый ключ - {field}'
-                )
-    return homework_list
+    try:
+        homeworks_uploaded = response.get('homeworks')
+    except KeyError as error:
+        logging.error(f'Ошибка доступа по ключу homeworks: {error}')
+        raise KeyError(f'Ошибка доступа по ключу homeworks: {error}')
+    if not isinstance(homeworks_uploaded, list):
+        logging.error('Ответ в некорректном формате')
+        raise TypeError('Ответ в некорректном формате')
+    if not homeworks_uploaded:
+        homeworks_uploaded = []
+        return homeworks_uploaded
+    return homeworks_uploaded
 
 
 def parse_status(homework):
@@ -112,15 +133,15 @@ def parse_status(homework):
         raise TypeError
     verdict = HOMEWORK_VERDICTS.get(status)
     if verdict is None:
-        logging.error(f'Неожиданный статус домашней работы - {status}')
-        return None
+        raise VerdictUnknown
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
 
 def main():
     """Основная логика работы бота."""
     if not check_tokens():
-        sys.exit()
+        logger.critical('Отсутствует одна из переменных окружения')
+        sys.exit(0)
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     timestamp = int(time.time()) - RETRY_PERIOD
     prev_message: str = ''
@@ -136,6 +157,17 @@ def main():
             if message != prev_message:
                 send_message(bot, message)
                 prev_message = message
+        except KeyResponseError:
+            logger.error('В ответе API отсутствует ожидаемый ключ')
+        except NotCorrectStatus:
+            logger.error('При запросе к API получен некорректный ответ')
+        except VerdictUnknown:
+            logging.error('Неожиданный статус домашней работы')
+            return None
+        except NotSentTelegramMessage:
+            message = 'Ошибка при отправке сообщения Telegram'
+            send_message(bot, message)
+            logger.error = message
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             logger.error(message)
