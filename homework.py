@@ -74,7 +74,6 @@ def send_message(bot, message):
         )
     except Exception as error:
         logger.error(f'Ошибка при отправке сообщения Telegram - {error}')
-    except telegram.error:
         raise NotSentTelegramMessage
     else:
         logger.debug('Сообщение успешно отправленно в Telegram')
@@ -162,9 +161,8 @@ def main():
             logger.error('При запросе к API получен некорректный ответ')
         except VerdictUnknown:
             logging.error('Неожиданный статус домашней работы')
-            return None
         except NotSentTelegramMessage:
-            logger.error('Ошибка при отправке сообщения Telegram')
+            logger.debug('Не отправилось сообщение почему-то')
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             logger.error(message)
