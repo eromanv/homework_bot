@@ -134,10 +134,10 @@ def main():
             logger.error('При запросе к API получен некорректный ответ')
         except NotSentTelegramMessage:
             message = 'Ошибка при отправке сообщения Telegram'
-            logger.error = message
+            logger.error(message)
         except NotValidResponse:
             message = 'Сервер вернул некорректный ответ'
-            logging.error = message
+            logging.error(message)
             send_message(bot, message)
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
