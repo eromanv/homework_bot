@@ -74,7 +74,6 @@ def get_api_answer(timestamp):
     try:
         return response.json()
     except json.JSONDecodeError:
-        logging.error('Сервер вернул невалидный ответ')
         raise NotValidResponse
 
 
@@ -138,6 +137,7 @@ def main():
             logger.error = message
         except NotValidResponse:
             message = 'Сервер вернул некорректный ответ'
+            logging.error = message
             send_message(bot, message)
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
