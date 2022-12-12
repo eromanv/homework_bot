@@ -70,7 +70,7 @@ def get_api_answer(timestamp):
     except requests.RequestException as error:
         logging.error(f'Ошибка при запросе к основному API: {error}')
     if response.status_code != HTTPStatus.OK:
-        raise NotCorrectStatus
+        raise NotValidResponse
     try:
         return response.json()
     except json.JSONDecodeError:
@@ -130,8 +130,6 @@ def main():
             if message != prev_message:
                 send_message(bot, message)
                 prev_message = message
-        except NotCorrectStatus:
-            logger.error('При запросе к API получен некорректный ответ')
         except NotSentTelegramMessage:
             message = 'Ошибка при отправке сообщения Telegram'
             logger.error(message)
