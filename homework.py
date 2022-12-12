@@ -6,6 +6,9 @@ import sys
 import time
 from http import HTTPStatus
 
+from exceptions import (
+    NotSentTelegramMessage, NotCorrectStatus, NotValidResponse
+)
 import requests
 import telegram
 from dotenv import load_dotenv
@@ -34,30 +37,6 @@ handler.setStream(sys.stdout)
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 handler.setFormatter(formatter)
 logger.addHandler(handler)
-
-
-class NotSentTelegramMessage(Exception):
-    """Определяем исключение для отправки сообщения."""
-
-    pass
-
-
-class NotCorrectStatus(Exception):
-    """Статус работы при запросе к API."""
-
-    pass
-
-
-class KeyResponseError(Exception):
-    """Не получен ожидаемый ключ."""
-
-    pass
-
-
-class VerdictUnknown(Exception):
-    """Неизвестный вердикт домашней работы."""
-
-    pass
 
 
 def check_tokens():
@@ -90,17 +69,13 @@ def get_api_answer(timestamp):
         )
     except requests.RequestException as error:
         logging.error(f'Ошибка при запросе к основному API: {error}')
-
     if response.status_code != HTTPStatus.OK:
         raise NotCorrectStatus
     try:
         return response.json()
     except json.JSONDecodeError:
         logging.error('Сервер вернул невалидный ответ')
-        send_message('Сервер вернул невалидный ответ')
-    if not isinstance(response, dict):
-        raise TypeError
-    return response
+        raise NotValidResponse
 
 
 def check_response(response):
@@ -116,8 +91,7 @@ def check_response(response):
         logging.error('Ответ в некорректном формате')
         raise TypeError('Ответ в некорректном формате')
     if not homeworks_uploaded:
-        homeworks_uploaded = []
-        return homeworks_uploaded
+        return homeworks_uploaded or []
     return homeworks_uploaded
 
 
@@ -141,7 +115,7 @@ def main():
     """Основная логика работы бота."""
     if not check_tokens():
         logger.critical('Отсутствует одна из переменных окружения')
-        sys.exit(0)
+        sys.exit('Токены некорректны, программа завершила свою работу')
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     timestamp = int(time.time()) - RETRY_PERIOD
     prev_message: str = ''
@@ -161,8 +135,10 @@ def main():
             logger.error('При запросе к API получен некорректный ответ')
         except NotSentTelegramMessage:
             message = 'Ошибка при отправке сообщения Telegram'
-            send_message(bot, message)
             logger.error = message
+        except NotValidResponse:
+            message = 'Сервер вернул некорректный ответ'
+            send_message(bot, message)
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             logger.error(message)
