@@ -92,7 +92,6 @@ def check_response(response):
     return homeworks_uploaded or []
 
 
-
 def parse_status(homework):
     """Принимает на вход работу, проверяет статус и возвращает строку."""
     status = homework.get('status')
