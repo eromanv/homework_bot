@@ -51,7 +51,7 @@ def send_message(bot, message):
             chat_id=TELEGRAM_CHAT_ID,
             text=message
         )
-    except Exception as error:
+    except telegram.error.TelegramError as error:
         logger.error(f'Ошибка при отправке сообщения Telegram - {error}')
     except telegram.error:
         raise NotSentTelegramMessage
@@ -89,9 +89,8 @@ def check_response(response):
     if not isinstance(homeworks_uploaded, list):
         logging.error('Ответ в некорректном формате')
         raise TypeError('Ответ в некорректном формате')
-    if not homeworks_uploaded:
-        return homeworks_uploaded or []
-    return homeworks_uploaded
+    return homeworks_uploaded or []
+
 
 
 def parse_status(homework):
